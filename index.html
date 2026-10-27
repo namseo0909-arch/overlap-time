@@ -98,7 +98,7 @@ input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;bo
 .tbox .colh.m{color:var(--mine)}
 .tbox .colh.o{color:var(--heat-solid)}
 .tbox .h{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:right;transform:translateY(-8px);font-variant-numeric:tabular-nums}
-.slot{height:32px;border-radius:7px;border:1px solid var(--line);background:var(--bg);padding:0;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.slot{height:24px;border-radius:7px;border:1px solid var(--line);background:var(--bg);padding:0;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
 .slot.mine{touch-action:none}
 .slot.mine.on{background:var(--mine);border-color:var(--mine)}
 .slot.mine:disabled{cursor:not-allowed;opacity:.5}
@@ -110,6 +110,18 @@ input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;bo
 .status{font-size:13px;color:var(--muted)}
 .status.busy{color:var(--warn)}
 .empty{text-align:center;padding:22px 12px;color:var(--muted);border:1px dashed var(--line);border-radius:12px;margin:0}
+.rooms{display:flex;flex-direction:column;gap:8px}
+.room{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.room:hover{border-color:var(--heat-solid)}
+.room b{font-size:16px;min-width:0;overflow-wrap:anywhere}
+.room small{color:var(--muted);flex:none}
+.lock{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--mine-soft);color:var(--ink);margin-left:6px;vertical-align:2px}
+.seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{flex:1;border:0;border-radius:8px;padding:8px;background:transparent;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-weight:700;font-size:14px}
+.room-head h2{font-size:22px;overflow-wrap:anywhere}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
 @media (max-width:420px){.brand{font-size:32px}.day{min-height:48px}}
 @media (prefers-reduced-motion:no-preference){.slot,.day,.chip{transition:background-color .12s}}
@@ -124,10 +136,53 @@ input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;bo
   </header>
   <p class="warn" id="global-msg" hidden></p>
 
+  <!-- 방 목록 -->
+  <section id="view-home" class="app" style="gap:16px">
+    <form class="panel" id="new-room" novalidate>
+      <b style="font-size:17px">새 방 만들기</b>
+      <div class="field">
+        <label for="nr-name">방 이름</label>
+        <input type="text" id="nr-name" maxlength="30" placeholder="방 이름">
+      </div>
+      <div class="seg" role="group" aria-label="공개 설정">
+        <button type="button" id="nr-public" aria-pressed="true">공개 방</button>
+        <button type="button" id="nr-private" aria-pressed="false">비공개 방</button>
+      </div>
+      <div class="field" id="nr-pw-wrap" hidden>
+        <label for="nr-pw">암호</label>
+        <input type="password" id="nr-pw" maxlength="30" placeholder="4자 이상" autocomplete="new-password">
+        <p class="note">암호를 아는 사람만 이 방의 약속을 보고 칠할 수 있어요.</p>
+      </div>
+      <p class="warn" id="nr-err" hidden></p>
+      <button class="btn" type="submit" id="nr-submit">방 만들기</button>
+    </form>
+    <div class="panel">
+      <b style="font-size:17px">방 목록</b>
+      <div class="rooms" id="rooms"><p class="empty">방 목록을 불러오는 중이에요…</p></div>
+    </div>
+  </section>
+
+  <!-- 비공개 방 암호 입력 -->
+  <section id="view-lock" class="app" hidden style="gap:16px">
+    <button class="link" type="button" data-home>← 방 목록</button>
+    <form class="panel" id="lock-form" novalidate>
+      <b style="font-size:17px"><span id="lock-name"></span><span class="lock">비공개</span></b>
+      <div class="field">
+        <label for="lock-pw">암호</label>
+        <input type="password" id="lock-pw" maxlength="30" autocomplete="current-password">
+      </div>
+      <p class="warn" id="lock-err" hidden></p>
+      <button class="btn" type="submit">들어가기</button>
+    </form>
+  </section>
+
+  <!-- 방 안 -->
+  <section id="view-room" class="app" hidden style="gap:16px">
+  <button class="link" type="button" data-home>← 방 목록</button>
   <div class="panel">
-    <input type="text" id="board-title" class="title-input" maxlength="30" placeholder="약속 이름" aria-label="약속 이름">
+    <div class="room-head"><h2 id="room-name"></h2></div>
     <div id="me-box"></div>
-    <button class="btn" type="button" id="copy-link">링크 복사해서 공유하기</button>
+    <button class="btn" type="button" id="copy-link">이 방 링크 복사해서 공유하기</button>
   </div>
 
   <div class="panel">
@@ -158,6 +213,7 @@ input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;bo
       <p class="detail" id="detail" hidden></p>
     </div>
   </div>
+  </section>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -166,7 +222,8 @@ const $ = s => document.querySelector(s);
 const DOW = "일월화수목금토";
 const H0 = 7, H1 = 24;                       // 07:00 ~ 24:00
 const S = {
-  db: null, canWrite: true, avail: new Map(), title: "",
+  db: null, canWrite: true, avail: new Map(),
+  rooms: new Map(), roomsLoaded: false, roomId: null, room: null, base: null, unsub: null, newPrivate: false,
   me: null, month: null, date: null, sel: null,
   local: new Map(),                          // date -> Set(내가 아직 저장 중인 칸)
   saving: false, queued: new Set()
@@ -177,14 +234,15 @@ const pad = n => String(n).padStart(2,"0");
 const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
 const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
 const dLabel = s => { const d = parse(s); return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+")"; };
-const hh = h => pad(h)+":00";
+const hh = h => pad(Math.floor(h))+":"+(h % 1 ? "30" : "00");
 const nameId = n => "n" + Array.from(new TextEncoder().encode(n)).map(b => b.toString(16).padStart(2,"0")).join("");
 const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
 const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e){} };
 let toastT;
 function toast(m){ const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2200); }
 function globalMsg(m){ $("#global-msg").textContent = m || ""; $("#global-msg").hidden = !m; }
-const HOURS = Array.from({length: H1-H0}, (_,i) => H0+i);
+const STEP = 0.5;                            // 30분 단위
+const HOURS = Array.from({length: (H1-H0)/STEP}, (_,i) => H0+i*STEP);
 
 /* ---------- 데이터 정리 ---------- */
 // 그날 칠한 사람들: [{name, slots:Set}] (내 칸은 저장 중인 값을 우선)
@@ -213,8 +271,8 @@ function bestRuns(m, total){
   for (const h of HOURS){
     const names = m.get(h), key = names.join("|");
     if (!names.length){ cur = null; continue; }
-    if (cur && cur.key === key && cur.end === h) cur.end = h+1;
-    else { cur = { start: h, end: h+1, names, key }; runs.push(cur); }
+    if (cur && cur.key === key && cur.end === h) cur.end = h+STEP;
+    else { cur = { start: h, end: h+STEP, names, key }; runs.push(cur); }
   }
   return runs.sort((a,b) => b.names.length - a.names.length || (b.end-b.start) - (a.end-a.start) || a.start - b.start);
 }
@@ -304,7 +362,7 @@ function renderBox(full){
   if (full || !box.childElementCount){
     let h = '<div></div><div class="colh m">내 시간</div><div class="colh o">겹치는 시간</div>';
     for (const hr of HOURS){
-      h += '<div class="h">'+hh(hr)+'</div>' +
+      h += '<div class="h">'+(hr % 1 ? '' : hh(hr))+'</div>' +
         '<button type="button" class="slot mine" data-h="'+hr+'" aria-label="'+hh(hr)+' 내 시간"'+(canPaint?"":" disabled")+'></button>' +
         '<button type="button" class="slot ov" data-h="'+hr+'"></button>';
     }
@@ -327,7 +385,7 @@ function renderDetail(m, people){
   if (S.sel == null || !S.date){ p.hidden = true; return; }
   people = people || peopleOn(S.date); m = m || overlap(people);
   const yes = m.get(S.sel) || [], no = people.map(x => x.name).filter(n => !yes.includes(n));
-  p.innerHTML = "<b>"+hh(S.sel)+"–"+hh(S.sel+1)+"</b><br>되는 사람: "+(yes.length ? yes.map(esc).join(", ") : "없음") +
+  p.innerHTML = "<b>"+hh(S.sel)+"–"+hh(S.sel+STEP)+"</b><br>되는 사람: "+(yes.length ? yes.map(esc).join(", ") : "없음") +
     (no.length ? '<br><span style="color:var(--muted)">안 되는 사람: '+no.map(esc).join(", ")+"</span>" : "");
   p.hidden = false;
 }
@@ -377,7 +435,7 @@ async function flush(){
   const date = [...S.queued][0]; if (!date){ return; }
   S.queued.delete(date); S.saving = true;
   const set = S.local.get(date), slots = [...set].sort((a,b) => a-b);
-  const ref = S.db.doc("avail/" + date + "_" + nameId(S.me));
+  const ref = S.db.doc(S.base + "/" + date + "_" + nameId(S.me));
   try {
     if (slots.length) await ref.set({ date, name: S.me, slots, updatedAt: Date.now() });
     else await ref.delete();
@@ -392,25 +450,119 @@ async function flush(){
   }
 }
 
-/* 약속 이름 */
-const titleInput = $("#board-title");
-titleInput.addEventListener("change", async () => {
-  const t = titleInput.value.trim().slice(0,30);
-  if (!S.db || !S.canWrite || t === S.title) return;
-  try { await S.db.doc("meta/board").set({ title: t, updatedAt: Date.now() }); S.title = t; toast("약속 이름을 저장했어요"); }
-  catch(x){ toast("약속 이름을 저장하지 못했어요"); }
+/* ---------- 방 ---------- */
+// 암호 → 해시. 암호 자체는 어디에도 저장하지 않아요.
+async function sha(text){
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  } catch(e){
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (const ch of text){ const c = ch.codePointAt(0); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+    return ((h2>>>0).toString(16).padStart(8,"0") + (h1>>>0).toString(16).padStart(8,"0")).repeat(4);
+  }
+}
+const keyFor = async (id, pw) => ({ check: await sha("check:"+id+":"+pw), data: await sha("data:"+id+":"+pw) });
+const dataPath = (id, dataKey) => dataKey ? "vault/" + dataKey + "/a" + dataKey.slice(0,24) : "rooms/" + id + "/avail";
+
+function show(view){ for (const v of ["home","lock","room"]) $("#view-"+v).hidden = v !== view; window.scrollTo(0,0); }
+
+function renderRooms(){
+  const box = $("#rooms");
+  if (!S.roomsLoaded) return;
+  const list = [...S.rooms.values()].sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+  if (!list.length){ box.innerHTML = '<p class="empty">아직 방이 없어요. 위에서 첫 방을 만들어 보세요.</p>'; return; }
+  box.innerHTML = list.map(r => '<button type="button" class="room" data-id="'+esc(r.id)+'"><b>'+esc(r.name||"이름 없는 방")+(r.private ? '<span class="lock">비공개</span>' : '')+'</b><small>들어가기 →</small></button>').join("");
+}
+$("#rooms").addEventListener("click", e => { const b = e.target.closest(".room"); if (b) location.hash = "r-" + b.dataset.id; });
+document.querySelectorAll("[data-home]").forEach(b => b.addEventListener("click", () => { location.hash = ""; }));
+
+function setPrivate(on){
+  S.newPrivate = on;
+  $("#nr-public").setAttribute("aria-pressed", !on); $("#nr-private").setAttribute("aria-pressed", on);
+  $("#nr-pw-wrap").hidden = !on;
+}
+$("#nr-public").onclick = () => setPrivate(false);
+$("#nr-private").onclick = () => setPrivate(true);
+$("#new-room").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = $("#nr-err"); err.hidden = true;
+  const name = $("#nr-name").value.trim().slice(0,30), pw = $("#nr-pw").value;
+  let msg = "";
+  if (!name) msg = "방 이름을 적어 주세요.";
+  else if (S.newPrivate && pw.length < 4) msg = "비공개 방 암호는 4자 이상으로 정해 주세요.";
+  else if (!S.db) msg = "아직 연결 중이에요. 잠시 후 다시 눌러 주세요.";
+  if (msg){ err.textContent = msg; err.hidden = false; return; }
+  const id = Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-3);
+  const room = { name, private: S.newPrivate, createdAt: Date.now() };
+  $("#nr-submit").disabled = true;
+  try {
+    if (S.newPrivate){
+      const k = await keyFor(id, pw);
+      room.check = k.check;
+      lsSet("overlap:key:"+id, JSON.stringify(k));
+    }
+    await S.db.doc("rooms/"+id).set(room);
+    $("#new-room").reset(); setPrivate(false);
+    location.hash = "r-" + id;
+    toast("방을 만들었어요. 링크를 복사해서 친구들에게 보내세요");
+  } catch(x){ err.textContent = "방을 만들지 못했어요. 잠시 후 다시 눌러 주세요."; err.hidden = false; }
+  finally { $("#nr-submit").disabled = false; }
 });
+
+function savedKey(id){ try { return JSON.parse(lsGet("overlap:key:"+id)); } catch(e){ return null; } }
+function enterRoom(id, dataKey){
+  if (S.unsub) S.unsub();
+  S.roomId = id; S.room = S.rooms.get(id); S.base = dataPath(id, dataKey);
+  S.avail = new Map(); S.local.clear(); S.queued.clear(); S.date = null; S.sel = null;
+  $("#room-name").innerHTML = esc(S.room.name) + (S.room.private ? '<span class="lock">비공개</span>' : '');
+  show("room"); renderAll();
+  S.unsub = S.db.collection(S.base).onSnapshot(s => {
+    S.avail = new Map(s.docs.map(d => [d.id, d.data()]));
+    if (!S.me) renderMe();
+    renderCal(); renderBox(false);
+  }, () => globalMsg("시간을 불러오지 못했어요. 새로고침해 주세요."));
+}
+function leaveRoom(){ if (S.unsub){ S.unsub(); S.unsub = null; } S.roomId = null; S.room = null; S.base = null; }
+
+function route(){
+  const h = location.hash.slice(1);
+  const m = /^r-([a-z0-9]{4,20})$/.exec(h);
+  if (!m){ leaveRoom(); show("home"); renderRooms(); return; }
+  const id = m[1];
+  if (!S.roomsLoaded) return;                       // 목록이 오면 다시 부름
+  const room = S.rooms.get(id);
+  if (!room){ leaveRoom(); show("home"); toast("방을 찾을 수 없어요"); return; }
+  if (S.roomId === id) return;
+  if (!room.private){ enterRoom(id, null); return; }
+  const k = savedKey(id);
+  if (k && k.check === room.check){ enterRoom(id, k.data); return; }
+  if (!$("#view-lock").hidden && $("#lock-form").dataset.id === id) return;   // 암호 입력 중이면 그대로 둠
+  leaveRoom();
+  $("#lock-form").dataset.id = id;
+  $("#lock-name").textContent = room.name; $("#lock-pw").value = ""; $("#lock-err").hidden = true;
+  show("lock"); $("#lock-pw").focus();
+}
+$("#lock-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const id = location.hash.slice(3), room = S.rooms.get(id); if (!room) return;
+  const k = await keyFor(id, $("#lock-pw").value);
+  if (k.check !== room.check){ $("#lock-err").textContent = "암호가 맞지 않아요."; $("#lock-err").hidden = false; return; }
+  lsSet("overlap:key:"+id, JSON.stringify(k));
+  enterRoom(id, k.data);
+});
+window.addEventListener("hashchange", route);
 
 function renderAll(){ renderMe(); renderCal(); renderBox(true); }
 
 /* ---------- 시작 ---------- */
 S.month = new Date(); S.month.setDate(1); S.month.setHours(0,0,0,0);
 S.me = lsGet("overlap:me");
-renderAll();
+route();
 /* 링크 복사 */
 $("#copy-link").addEventListener("click", async () => {
-  const url = location.href.split("#")[0];
-  try { await navigator.clipboard.writeText(url); toast("링크를 복사했어요. 단톡방에 붙여 넣으세요"); }
+  const url = location.href.split("#")[0] + (S.roomId ? "#r-" + S.roomId : "");
+  try { await navigator.clipboard.writeText(url); toast(S.room && S.room.private ? "링크를 복사했어요. 암호는 따로 알려 주세요" : "링크를 복사했어요. 단톡방에 붙여 넣으세요"); }
   catch(e){ prompt("이 링크를 복사하세요", url); }
 });
 
@@ -421,7 +573,7 @@ function localDB(){
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch(e){} subs.forEach(f => f()); };
   const sub = f => { subs.add(f); f(); return () => subs.delete(f); };
   return {
-    collection: name => ({ onSnapshot: next => sub(() => next({ docs: Object.keys(data).filter(k => k.startsWith(name+"/")).map(k => ({ id: k.slice(name.length+1), data: () => data[k] })) })) }),
+    collection: name => ({ onSnapshot: next => sub(() => next({ docs: Object.keys(data).filter(k => k.startsWith(name+"/") && !k.slice(name.length+1).includes("/")).map(k => ({ id: k.slice(name.length+1), data: () => data[k] })) })) }),
     doc: path => ({
       set: async v => { data[path] = v; save(); },
       delete: async () => { delete data[path]; save(); },
@@ -440,16 +592,12 @@ function localDB(){
     db = localDB();
   }
   S.db = db;
-  db.doc("meta/board").onSnapshot(s => {
-    S.title = s.exists ? (s.data().title || "") : "";
-    if (document.activeElement !== titleInput) titleInput.value = S.title;
-  }, () => {});
-  db.collection("avail").onSnapshot(s => {
-    S.avail = new Map(s.docs.map(d => [d.id, d.data()]));
-    if (!S.me) renderMe();
-    renderCal(); renderBox(false);
-  }, () => globalMsg("시간을 불러오지 못했어요. 새로고침해 주세요."));
-  renderAll();
+  db.collection("rooms").onSnapshot(s => {
+    S.rooms = new Map(s.docs.map(d => [d.id, Object.assign({ id: d.id }, d.data())]));
+    const first = !S.roomsLoaded; S.roomsLoaded = true;
+    renderRooms();
+    if (first || !S.roomId) route();
+  }, () => globalMsg("방 목록을 불러오지 못했어요. 새로고침해 주세요."));
 })();
 </script>
 </body>
