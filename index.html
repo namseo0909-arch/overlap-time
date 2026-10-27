@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>겹치는 시간</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ▼ Firebase 콘솔에서 받은 설정을 여기에 붙여 넣으세요 (비워 두면 이 기기에만 저장되는 테스트 모드) */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDPngEjlTBnPG_v6vgjZK0K-XnMvOjSnNY",
+  authDomain: "overlap-time-5c490.firebaseapp.com",
+  projectId: "overlap-time-5c490",
+  storageBucket: "overlap-time-5c490.firebasestorage.app",
+  messagingSenderId: "957757347253",
+  appId: "1:957757347253:web:c884a965ab6d7fb65475fc"
+};
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: calendar on top, the day's time box below it; "my time" and "overlap" sit side by side on each hour row */
+:root{
+  --bg:#F2F5F1; --surface:#FFFFFF; --ink:#17231E; --muted:#5C6B64; --line:#D5DED8;
+  --heat:31,122,90; --heat-solid:#1F7A5A; --on-heat:#FFFFFF;
+  --mine:#E2603F; --mine-soft:#FBE3DB; --on-mine:#FFFFFF; --warn:#A8501C;
+  --f-display:"Black Han Sans","IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#101714; --surface:#17211D; --ink:#E5EDE9; --muted:#93A39B; --line:#2A3833;
+  --heat:76,196,150; --heat-solid:#4CC496; --on-heat:#0D1411;
+  --mine:#F07E62; --mine-soft:#3A2620; --on-mine:#1A0E0A; --warn:#E89A6A; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#101714; --surface:#17211D; --ink:#E5EDE9; --muted:#93A39B; --line:#2A3833;
+  --heat:76,196,150; --heat-solid:#4CC496; --on-heat:#0D1411;
+  --mine:#F07E62; --mine-soft:#3A2620; --on-mine:#1A0E0A; --warn:#E89A6A; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.app{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2{margin:0;text-wrap:balance}
+.brand{font-family:var(--f-display);font-weight:400;font-size:38px;line-height:1;letter-spacing:.5px}
+.brand span{color:var(--heat-solid)}
+.sub{color:var(--muted);margin:6px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+button{font:inherit;cursor:pointer;color:inherit}
+.btn{border:0;border-radius:10px;padding:10px 16px;font-weight:700;background:var(--heat-solid);color:var(--on-heat)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:7px 12px;font-size:13px}
+.link{background:none;border:0;padding:0;color:var(--muted);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--mine);outline-offset:2px}
+.note{font-size:13px;color:var(--muted);margin:0}
+.warn{color:var(--warn);font-size:13px;margin:0}
+input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+.title-input{font-size:18px;font-weight:700;background:transparent;border-color:transparent;padding:6px 8px;margin:-6px -8px}
+.title-input:hover,.title-input:focus{border-color:var(--line);background:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:14px}
+.chip.on{background:var(--mine);border-color:var(--mine);color:var(--on-mine);font-weight:700}
+.me{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.me b{background:var(--mine-soft);border-radius:999px;padding:3px 12px}
+
+/* calendar */
+.cal-head{display:flex;align-items:center;justify-content:space-between}
+.cal-head h2{font-size:18px}
+.nav{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:16px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{text-align:center;font-size:12px;font-weight:700;color:var(--muted)}
+.dow.sun{color:var(--mine)}
+.day{position:relative;min-height:54px;border-radius:10px;border:1px solid var(--line);background:var(--bg);padding:5px 0 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums}
+.day.out{visibility:hidden}
+.day.past{opacity:.35}
+.day.today .n{text-decoration:underline;text-underline-offset:3px}
+.day .b{font-family:var(--f-body);font-size:11px;line-height:1;border-radius:999px;padding:2px 6px;background:rgba(var(--heat),.18);color:var(--ink)}
+.day .b.all{background:var(--heat-solid);color:var(--on-heat);font-weight:700}
+.day .mine-dot{position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--mine)}
+.day.sel{border:2px solid var(--ink);padding:4px 0 3px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%}
+
+/* time box */
+.tb-head h2{font-size:20px}
+.best{border-radius:10px;padding:10px 12px;background:var(--bg);font-size:14px}
+.best.all{background:rgba(var(--heat),.16)}
+.best b{font-family:var(--f-mono);font-weight:500}
+.tbox{display:grid;grid-template-columns:52px 1fr 1fr;gap:3px 6px;user-select:none;-webkit-user-select:none}
+.tbox .colh{font-size:12px;font-weight:700;text-align:center;color:var(--muted);padding-bottom:4px}
+.tbox .colh.m{color:var(--mine)}
+.tbox .colh.o{color:var(--heat-solid)}
+.tbox .h{font-family:var(--f-mono);font-size:11px;color:var(--muted);text-align:right;transform:translateY(-8px);font-variant-numeric:tabular-nums}
+.slot{height:32px;border-radius:7px;border:1px solid var(--line);background:var(--bg);padding:0;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.slot.mine{touch-action:none}
+.slot.mine.on{background:var(--mine);border-color:var(--mine)}
+.slot.mine:disabled{cursor:not-allowed;opacity:.5}
+.slot.ov{border-color:transparent;background:rgba(var(--heat),var(--a,0))}
+.slot.ov.zero{background:var(--bg);border-color:var(--line);color:transparent}
+.slot.ov.hot{color:var(--on-heat);font-weight:500}
+.slot.ov.sel{outline:2px solid var(--ink);outline-offset:1px}
+.detail{font-size:14px;padding:10px 12px;border-radius:10px;background:var(--bg);margin:0}
+.status{font-size:13px;color:var(--muted)}
+.status.busy{color:var(--warn)}
+.empty{text-align:center;padding:22px 12px;color:var(--muted);border:1px dashed var(--line);border-radius:12px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+@media (max-width:420px){.brand{font-size:32px}.day{min-height:48px}}
+@media (prefers-reduced-motion:no-preference){.slot,.day,.chip{transition:background-color .12s}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1 class="brand">겹치는 <span>시간</span></h1>
+    <p class="sub">날짜를 누르고 되는 시간을 칠하면, 친구들과 겹치는 시간이 보여요.</p>
+  </header>
+  <p class="warn" id="global-msg" hidden></p>
+
+  <div class="panel">
+    <input type="text" id="board-title" class="title-input" maxlength="30" placeholder="약속 이름" aria-label="약속 이름">
+    <div id="me-box"></div>
+    <button class="btn" type="button" id="copy-link">링크 복사해서 공유하기</button>
+  </div>
+
+  <div class="panel">
+    <div class="cal-head">
+      <button class="nav" id="prev" type="button" aria-label="이전 달">‹</button>
+      <h2 id="month"></h2>
+      <button class="nav" id="next" type="button" aria-label="다음 달">›</button>
+    </div>
+    <div class="cal" id="cal"></div>
+    <div class="legend">
+      <span><i style="background:rgba(var(--heat),.35)"></i>칠한 사람 수</span>
+      <span><i style="background:var(--heat-solid)"></i>모두 겹치는 시간 있음</span>
+      <span><i style="background:var(--mine)"></i>내가 칠한 날</span>
+    </div>
+  </div>
+
+  <div class="panel" id="tb">
+    <p class="empty" id="tb-empty">위 달력에서 날짜를 누르면 그날의 타임박스가 열려요.</p>
+    <div id="tb-body" hidden style="display:flex;flex-direction:column;gap:12px">
+      <div class="row between tb-head">
+        <h2 id="tb-date"></h2>
+        <span class="status" id="save-status"></span>
+      </div>
+      <div class="best" id="best"></div>
+      <div class="chips" id="day-people"></div>
+      <p class="note" id="tb-hint">왼쪽 <b style="color:var(--mine)">내 시간</b> 칸을 누르거나 위아래로 끌어서 칠해요. 칠하면 자동으로 저장돼요.</p>
+      <div class="tbox" id="tbox"></div>
+      <p class="detail" id="detail" hidden></p>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const DOW = "일월화수목금토";
+const H0 = 7, H1 = 24;                       // 07:00 ~ 24:00
+const S = {
+  db: null, canWrite: true, avail: new Map(), title: "",
+  me: null, month: null, date: null, sel: null,
+  local: new Map(),                          // date -> Set(내가 아직 저장 중인 칸)
+  saving: false, queued: new Set()
+};
+
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d); };
+const dLabel = s => { const d = parse(s); return (d.getMonth()+1)+"월 "+d.getDate()+"일 ("+DOW[d.getDay()]+")"; };
+const hh = h => pad(h)+":00";
+const nameId = n => "n" + Array.from(new TextEncoder().encode(n)).map(b => b.toString(16).padStart(2,"0")).join("");
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e){ return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e){} };
+let toastT;
+function toast(m){ const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2200); }
+function globalMsg(m){ $("#global-msg").textContent = m || ""; $("#global-msg").hidden = !m; }
+const HOURS = Array.from({length: H1-H0}, (_,i) => H0+i);
+
+/* ---------- 데이터 정리 ---------- */
+// 그날 칠한 사람들: [{name, slots:Set}] (내 칸은 저장 중인 값을 우선)
+function peopleOn(date){
+  const list = [];
+  for (const r of S.avail.values()){
+    if (r.date !== date || !r.name) continue;
+    if (r.name === S.me && S.local.has(date)) continue;
+    if ((r.slots||[]).length) list.push({ name: r.name, slots: new Set(r.slots) });
+  }
+  if (S.me && S.local.has(date) && S.local.get(date).size) list.push({ name: S.me, slots: S.local.get(date) });
+  return list.sort((a,b) => a.name.localeCompare(b.name, "ko"));
+}
+function mySlots(date){
+  if (S.local.has(date)) return S.local.get(date);
+  const r = S.me && S.avail.get(date+"_"+nameId(S.me));
+  return new Set(r ? (r.slots||[]) : []);
+}
+function overlap(people){
+  const m = new Map(HOURS.map(h => [h, []]));
+  for (const p of people) for (const h of p.slots) if (m.has(h)) m.get(h).push(p.name);
+  return m;
+}
+function bestRuns(m, total){
+  const runs = []; let cur = null;
+  for (const h of HOURS){
+    const names = m.get(h), key = names.join("|");
+    if (!names.length){ cur = null; continue; }
+    if (cur && cur.key === key && cur.end === h) cur.end = h+1;
+    else { cur = { start: h, end: h+1, names, key }; runs.push(cur); }
+  }
+  return runs.sort((a,b) => b.names.length - a.names.length || (b.end-b.start) - (a.end-a.start) || a.start - b.start);
+}
+function allNames(){
+  const s = new Set(); for (const r of S.avail.values()) if (r.name) s.add(r.name);
+  return [...s].sort((a,b) => a.localeCompare(b,"ko"));
+}
+
+/* ---------- 내 이름 ---------- */
+function renderMe(){
+  const box = $("#me-box");
+  if (S.me){
+    box.innerHTML = '<div class="me"><b>'+esc(S.me)+'</b><button class="link" type="button" id="me-change">이름 바꾸기</button></div>';
+    $("#me-change").onclick = () => { S.me = null; S.local.clear(); renderAll(); };
+    return;
+  }
+  const names = allNames();
+  box.innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:8px"><b>먼저 내 이름을 정해 주세요</b>' +
+    (names.length ? '<div class="chips" id="me-chips">'+names.map(n => '<button type="button" class="chip" data-n="'+esc(n)+'">'+esc(n)+'</button>').join("")+'</div>' : '') +
+    '<div class="row" style="flex-wrap:nowrap"><input type="text" id="me-input" maxlength="12" placeholder="이름 입력" aria-label="내 이름"><button class="btn small" type="button" id="me-ok" style="flex:none">확인</button></div></div>';
+  const set = n => { n = (n||"").trim().slice(0,12); if (!n) return; S.me = n; lsSet("overlap:me", n); renderAll(); };
+  $("#me-ok").onclick = () => set($("#me-input").value);
+  $("#me-input").onkeydown = e => { if (e.key === "Enter") set(e.target.value); };
+  const chips = $("#me-chips"); if (chips) chips.onclick = e => { const c = e.target.closest(".chip"); if (c) set(c.dataset.n); };
+}
+
+/* ---------- 달력 ---------- */
+function renderCal(){
+  const m = S.month, y = m.getFullYear(), mo = m.getMonth();
+  $("#month").textContent = y + "년 " + (mo+1) + "월";
+  const first = new Date(y, mo, 1), days = new Date(y, mo+1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  let html = [...DOW].map((d,i) => '<div class="dow'+(i===0?" sun":"")+'">'+d+'</div>').join("");
+  for (let i = 0; i < first.getDay(); i++) html += '<div class="day out"></div>';
+  for (let d = 1; d <= days; d++){
+    const dt = new Date(y, mo, d), k = ymd(dt);
+    const people = peopleOn(k);
+    let badge = "";
+    if (people.length){
+      const top = Math.max(...[...overlap(people).values()].map(a => a.length));
+      const all = people.length >= 2 && top === people.length;
+      badge = '<span class="b'+(all?" all":"")+'">'+people.length+'명</span>';
+    }
+    const mine = S.me && mySlots(k).size ? '<span class="mine-dot" aria-hidden="true"></span>' : "";
+    const cls = "day" + (dt < today ? " past" : "") + (+dt === +today ? " today" : "") + (k === S.date ? " sel" : "");
+    html += '<button type="button" class="'+cls+'" data-k="'+k+'" aria-label="'+dLabel(k)+(people.length?", "+people.length+"명 칠함":"")+'" aria-pressed="'+(k===S.date)+'">'+mine+'<span class="n">'+d+'</span>'+badge+'</button>';
+  }
+  $("#cal").innerHTML = html;
+}
+$("#cal").addEventListener("click", e => {
+  const b = e.target.closest(".day"); if (!b || !b.dataset.k) return;
+  S.date = b.dataset.k; S.sel = null;
+  renderCal(); renderBox(true);
+  setTimeout(() => $("#tb").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }), 0);
+});
+$("#prev").onclick = () => { S.month = new Date(S.month.getFullYear(), S.month.getMonth()-1, 1); renderCal(); };
+$("#next").onclick = () => { S.month = new Date(S.month.getFullYear(), S.month.getMonth()+1, 1); renderCal(); };
+
+/* ---------- 타임박스 ---------- */
+function renderBox(full){
+  const d = S.date;
+  $("#tb-empty").hidden = !!d; $("#tb-body").hidden = !d;
+  if (!d) return;
+  $("#tb-body").style.display = "flex";
+  $("#tb-date").textContent = dLabel(d);
+  const people = peopleOn(d), total = people.length, m = overlap(people), mine = mySlots(d);
+
+  const best = bestRuns(m, total)[0];
+  const bx = $("#best");
+  if (!total){ bx.className = "best"; bx.innerHTML = "아직 이날 시간을 칠한 사람이 없어요. 첫 번째로 칠해 보세요."; }
+  else if (total === 1){ bx.className = "best"; bx.innerHTML = esc(people[0].name) + "님만 칠했어요. 친구들이 칠하면 겹치는 시간이 보여요."; }
+  else if (!best || best.names.length < 2){ bx.className = "best"; bx.innerHTML = total + "명이 칠했지만 아직 겹치는 시간이 없어요."; }
+  else {
+    const all = best.names.length === total;
+    bx.className = "best" + (all ? " all" : "");
+    bx.innerHTML = (all ? "✓ 모두 겹치는 시간 " : "가장 많이 겹치는 시간 ") + "<b>"+hh(best.start)+"–"+hh(best.end)+"</b> · " + (all ? total+"명 모두" : total+"명 중 "+best.names.length+"명");
+  }
+  $("#day-people").innerHTML = people.map(p => '<span class="chip'+(p.name===S.me?" on":"")+'">'+esc(p.name)+'</span>').join("");
+
+  const canPaint = !!S.me && S.canWrite && !!S.db;
+  $("#tb-hint").innerHTML = !S.me ? "위에서 <b>내 이름</b>을 먼저 정하면 칠할 수 있어요."
+    : !S.canWrite ? "지금은 보기 전용이라 칠할 수 없어요. 링크를 보낸 사람에게 '참여자' 권한을 부탁해 주세요."
+    : '왼쪽 <b style="color:var(--mine)">내 시간</b> 칸을 누르거나 위아래로 끌어서 칠해요. 칠하면 자동으로 저장돼요.';
+
+  const box = $("#tbox");
+  if (full || !box.childElementCount){
+    let h = '<div></div><div class="colh m">내 시간</div><div class="colh o">겹치는 시간</div>';
+    for (const hr of HOURS){
+      h += '<div class="h">'+hh(hr)+'</div>' +
+        '<button type="button" class="slot mine" data-h="'+hr+'" aria-label="'+hh(hr)+' 내 시간"'+(canPaint?"":" disabled")+'></button>' +
+        '<button type="button" class="slot ov" data-h="'+hr+'"></button>';
+    }
+    box.innerHTML = h;
+  }
+  box.querySelectorAll(".slot.mine").forEach(c => {
+    const on = mine.has(+c.dataset.h); c.classList.toggle("on", on); c.setAttribute("aria-pressed", on); c.disabled = !canPaint;
+  });
+  box.querySelectorAll(".slot.ov").forEach(c => {
+    const hr = +c.dataset.h, n = m.get(hr).length, ratio = total ? n/total : 0;
+    c.style.setProperty("--a", n ? (0.18 + 0.82*ratio).toFixed(2) : 0);
+    c.className = "slot ov" + (n ? (ratio >= .55 ? " hot" : "") : " zero") + (S.sel === hr ? " sel" : "");
+    c.textContent = n ? (total > 1 ? n+"/"+total : n+"명") : "";
+    c.setAttribute("aria-label", hh(hr)+" "+n+"명 가능");
+  });
+  renderDetail(m, people);
+}
+function renderDetail(m, people){
+  const p = $("#detail");
+  if (S.sel == null || !S.date){ p.hidden = true; return; }
+  people = people || peopleOn(S.date); m = m || overlap(people);
+  const yes = m.get(S.sel) || [], no = people.map(x => x.name).filter(n => !yes.includes(n));
+  p.innerHTML = "<b>"+hh(S.sel)+"–"+hh(S.sel+1)+"</b><br>되는 사람: "+(yes.length ? yes.map(esc).join(", ") : "없음") +
+    (no.length ? '<br><span style="color:var(--muted)">안 되는 사람: '+no.map(esc).join(", ")+"</span>" : "");
+  p.hidden = false;
+}
+
+/* 칠하기: 누르면 토글, 위아래로 끌면 같은 상태로 이어서 칠함 */
+let painting = false, paintOn = true;
+const tbox = $("#tbox");
+function applySlot(c){
+  const h = +c.dataset.h, d = S.date;
+  if (!S.local.has(d)) S.local.set(d, new Set(mySlots(d)));
+  const set = S.local.get(d);
+  if (paintOn === set.has(h)) return;
+  paintOn ? set.add(h) : set.delete(h);
+  renderBox(false);
+}
+tbox.addEventListener("pointerdown", e => {
+  const c = e.target.closest(".slot.mine"); if (!c || c.disabled) return;
+  e.preventDefault();
+  painting = true; paintOn = !mySlots(S.date).has(+c.dataset.h); applySlot(c);
+});
+tbox.addEventListener("pointermove", e => {
+  if (!painting) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const c = el && el.closest && el.closest(".slot.mine");
+  if (c && tbox.contains(c)) applySlot(c);
+});
+function endPaint(){ if (!painting) return; painting = false; queueSave(S.date); renderCal(); }
+window.addEventListener("pointerup", endPaint);
+window.addEventListener("pointercancel", endPaint);
+tbox.addEventListener("click", e => {
+  const ov = e.target.closest(".slot.ov");
+  if (ov){ const h = +ov.dataset.h; S.sel = S.sel === h ? null : h; renderBox(false); return; }
+  const c = e.target.closest(".slot.mine");
+  if (c && e.detail === 0 && !c.disabled){ paintOn = !mySlots(S.date).has(+c.dataset.h); applySlot(c); queueSave(S.date); renderCal(); }
+});
+
+/* 자동 저장: 같은 문서에는 한 번에 하나씩 */
+let saveTimer;
+function setStatus(t, busy){ const s = $("#save-status"); s.textContent = t; s.className = "status" + (busy ? " busy" : ""); }
+function queueSave(date){
+  if (!date || !S.local.has(date)) return;
+  S.queued.add(date); setStatus("저장 중…", true);
+  clearTimeout(saveTimer); saveTimer = setTimeout(flush, 500);
+}
+async function flush(){
+  if (S.saving) return;
+  const date = [...S.queued][0]; if (!date){ return; }
+  S.queued.delete(date); S.saving = true;
+  const set = S.local.get(date), slots = [...set].sort((a,b) => a-b);
+  const ref = S.db.doc("avail/" + date + "_" + nameId(S.me));
+  try {
+    if (slots.length) await ref.set({ date, name: S.me, slots, updatedAt: Date.now() });
+    else await ref.delete();
+    if (!S.queued.has(date) && S.local.get(date) === set && [...set].sort((a,b)=>a-b).join() === slots.join()) S.local.delete(date);
+    setStatus(S.queued.size ? "저장 중…" : "저장됨", S.queued.size > 0);
+  } catch(x){
+    if (x && x.code === "permission-denied"){ S.canWrite = false; S.local.clear(); globalMsg("저장이 막혀 있어요. Firebase 보안 규칙을 확인해 주세요."); renderAll(); }
+    else { setStatus("저장 못 함 · 다시 칠해 보세요", true); }
+  } finally {
+    S.saving = false;
+    if (S.queued.size) flush();
+  }
+}
+
+/* 약속 이름 */
+const titleInput = $("#board-title");
+titleInput.addEventListener("change", async () => {
+  const t = titleInput.value.trim().slice(0,30);
+  if (!S.db || !S.canWrite || t === S.title) return;
+  try { await S.db.doc("meta/board").set({ title: t, updatedAt: Date.now() }); S.title = t; toast("약속 이름을 저장했어요"); }
+  catch(x){ toast("약속 이름을 저장하지 못했어요"); }
+});
+
+function renderAll(){ renderMe(); renderCal(); renderBox(true); }
+
+/* ---------- 시작 ---------- */
+S.month = new Date(); S.month.setDate(1); S.month.setHours(0,0,0,0);
+S.me = lsGet("overlap:me");
+renderAll();
+/* 링크 복사 */
+$("#copy-link").addEventListener("click", async () => {
+  const url = location.href.split("#")[0];
+  try { await navigator.clipboard.writeText(url); toast("링크를 복사했어요. 단톡방에 붙여 넣으세요"); }
+  catch(e){ prompt("이 링크를 복사하세요", url); }
+});
+
+/* Firebase 설정이 없으면 이 기기에만 저장하는 테스트 모드 */
+function localDB(){
+  const KEY = "overlap:localdb", subs = new Set();
+  let data = {}; try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch(e){} subs.forEach(f => f()); };
+  const sub = f => { subs.add(f); f(); return () => subs.delete(f); };
+  return {
+    collection: name => ({ onSnapshot: next => sub(() => next({ docs: Object.keys(data).filter(k => k.startsWith(name+"/")).map(k => ({ id: k.slice(name.length+1), data: () => data[k] })) })) }),
+    doc: path => ({
+      set: async v => { data[path] = v; save(); },
+      delete: async () => { delete data[path]; save(); },
+      onSnapshot: next => sub(() => next({ exists: path in data, data: () => data[path] }))
+    })
+  };
+}
+
+(() => {
+  let db;
+  if (FIREBASE_CONFIG.apiKey && window.firebase){
+    try { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); }
+    catch(e){ globalMsg("Firebase 설정을 확인해 주세요. 지금은 이 기기에만 저장돼요."); db = localDB(); }
+  } else {
+    globalMsg("테스트 모드: 아직 Firebase를 연결하지 않아서 이 기기에만 저장돼요.");
+    db = localDB();
+  }
+  S.db = db;
+  db.doc("meta/board").onSnapshot(s => {
+    S.title = s.exists ? (s.data().title || "") : "";
+    if (document.activeElement !== titleInput) titleInput.value = S.title;
+  }, () => {});
+  db.collection("avail").onSnapshot(s => {
+    S.avail = new Map(s.docs.map(d => [d.id, d.data()]));
+    if (!S.me) renderMe();
+    renderCal(); renderBox(false);
+  }, () => globalMsg("시간을 불러오지 못했어요. 새로고침해 주세요."));
+  renderAll();
+})();
+</script>
+</body>
+</html>
