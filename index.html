@@ -178,9 +178,11 @@ input[type=text]{font:inherit;width:100%;padding:10px 12px;border-radius:10px;bo
 
   <!-- 방 안 -->
   <section id="view-room" class="app" hidden style="gap:16px">
-  <button class="link" type="button" data-home>← 방 목록</button>
   <div class="panel">
-    <div class="room-head"><h2 id="room-name"></h2></div>
+    <div class="row between room-head" style="flex-wrap:nowrap">
+      <h2 id="room-name" style="min-width:0"></h2>
+      <button class="btn ghost small" type="button" id="leave-room" style="flex:none">방 나가기</button>
+    </div>
     <div id="me-box"></div>
     <button class="btn" type="button" id="copy-link">이 방 링크 복사해서 공유하기</button>
   </div>
@@ -523,6 +525,12 @@ function enterRoom(id, dataKey){
     renderCal(); renderBox(false);
   }, () => globalMsg("시간을 불러오지 못했어요. 새로고침해 주세요."));
 }
+$("#leave-room").addEventListener("click", () => {
+  const room = S.room;
+  if (room && room.private) { try { localStorage.removeItem("overlap:key:" + room.id); } catch(e){} }
+  location.hash = "";
+  toast(room && room.private ? "방에서 나왔어요. 다시 들어오려면 암호가 필요해요" : "방에서 나왔어요");
+});
 function leaveRoom(){ if (S.unsub){ S.unsub(); S.unsub = null; } S.roomId = null; S.room = null; S.base = null; }
 
 function route(){
